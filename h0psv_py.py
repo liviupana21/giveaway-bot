@@ -24,7 +24,7 @@ active_giveaways = {}  # {message_id: end_time}
 
 class GiveawayMenu(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # 🔒 Meniul rămâne activ permanent
+        super().__init__(timeout=None)
         self.select = discord.ui.Select(
             placeholder="Alege o acțiune...",
             options=[
@@ -82,19 +82,35 @@ async def start_giveaway(interaction, prize, duration):
 
     active_giveaways.pop(msg.id, None)
 
-    msg = await interaction.channel.fetch_message(msg.id)
+    await asyncio.sleep(1)  # asigură că reacțiile sunt încărcate
     reaction = discord.utils.get(msg.reactions, emoji="🎉")
 
     if not reaction:
-        await interaction.channel.send("Nicio reacție detectată, giveaway anulat.")
+        embed = discord.Embed(
+            title="⛔ Giveaway încheiat",
+            description="Nicio reacție detectată. Giveaway-ul a fost anulat.",
+            color=discord.Color.red()
+        )
+        await msg.edit(embed=embed)
         return
 
     users = [user async for user in reaction.users() if not user.bot]
     if not users:
-        await interaction.channel.send("Nimeni nu a participat la giveaway.")
+        embed = discord.Embed(
+            title="⚠️ Giveaway încheiat",
+            description="Nimeni nu a participat la giveaway.",
+            color=discord.Color.orange()
+        )
+        await msg.edit(embed=embed)
     else:
         winner = random.choice(users)
-        await interaction.channel.send(f"🎊 Felicitări {winner.mention}, ai câștigat **{prize}**!")
+        embed = discord.Embed(
+            title="🎉 Giveaway încheiat",
+            description=f"Felicitări pentru câștigător:\n{winner.mention}",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Premiu: {prize}")
+        await msg.edit(embed=embed)
 
 async def end_giveaway(interaction):
     for msg_id, end_time in list(active_giveaways.items()):
