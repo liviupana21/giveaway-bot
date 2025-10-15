@@ -8,7 +8,7 @@ import datetime
 # ================= BOT CONFIG =================
 
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
-GIVEAWAY_CHANNEL_ID = os.environ.get('GIVEAWAY_CHANNEL_ID')
+GIVEAWAY_CHANNEL_ID = int(os.environ.get('GIVEAWAY_CHANNEL_ID'))
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -32,20 +32,32 @@ async def on_reaction_add(reaction, user):
 
     end_time = active_giveaways.get(reaction.message.id)
     if not end_time:
-        return  # mesajul nu e un giveaway activ
+        return
 
     if datetime.datetime.utcnow() > end_time:
         try:
+            await reaction.remove(user)
             await user.send("⏰ Giveaway-ul s-a terminat și nu mai poți participa.")
-        except:
+        except discord.Forbidden:
             pass
+
+# ================= FUNCȚIE TIMER =================
+
+async def update_giveaway_timer(msg, prize, end_time):
+    while True:
+        time_left = int((end_time - datetime.datetime.utcnow()).total_seconds())
+        if time_left <= 0:
+            break
+        embed = msg.embeds[0]
+        embed.description = f"Premiu: **{prize}**\nReacționează cu 🎉 pentru a participa!\nTimp rămas: {time_left} secunde"
+        await msg.edit(embed=embed)
+        await asyncio.sleep(1)
 
 # ================= GIVEAWAY COMMAND =================
 
 @bot.command()
 async def giveaway(ctx, duration: int, *, prize: str):
-    channel_id = int(GIVEAWAY_CHANNEL_ID)
-    channel = bot.get_channel(channel_id)
+    channel = bot.get_channel(GIVEAWAY_CHANNEL_ID)
     if not channel:
         await ctx.send("❌ Canalul de giveaway nu a fost găsit.")
         return
@@ -64,16 +76,11 @@ async def giveaway(ctx, duration: int, *, prize: str):
 
     active_giveaways[msg.id] = end_time
 
-    # Loop pentru a actualiza timpul rămas
-    while True:
-        time_left = int((end_time - datetime.datetime.utcnow()).total_seconds())
-        if time_left <= 0:
-            break
-        embed.description = f"Premiu: **{prize}**\nReacționează cu 🎉 pentru a participa!\nTimp rămas: {time_left} secunde"
-        await msg.edit(embed=embed)
-        await asyncio.sleep(1)
+    asyncio.create_task(update_giveaway_timer(msg, prize, end_time))
 
-    # Giveaway terminat, elimină din active
+    await asyncio.sleep(duration)
+
+    # Giveaway terminat
     active_giveaways.pop(msg.id)
 
     # Colectează participanții
@@ -90,6 +97,6 @@ async def giveaway(ctx, duration: int, *, prize: str):
         winner = random.choice(users)
         await channel.send(f"🎊 Felicitări {winner.mention}, ai câștigat **{prize}**!")
 
-# ================= END GIVEAWAY COMMAND =================
+# ================= END =================
 
 bot.run(DISCORD_TOKEN)
