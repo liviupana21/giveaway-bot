@@ -7,7 +7,9 @@ import os
 
 # ================= CONFIG =================
 
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")  # Setează tokenul în variabilele de mediu
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+GIVEAWAY_CHANNEL_ID = int(os.environ.get("GIVEAWAY_CHANNEL_ID"))
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.reactions = True
@@ -21,17 +23,23 @@ active_giveaways = {}  # {message_id: end_time}
 # ================= UI COMPONENTS =================
 
 class GiveawayMenu(discord.ui.View):
-    @discord.ui.select(
-        placeholder="Alege o acțiune...",
-        options=[
-            discord.SelectOption(label="Start Giveaway", value="start", emoji="🎉"),
-            discord.SelectOption(label="End Giveaway", value="end", emoji="🛑")
-        ]
-    )
-    async def select_callback(self, select, interaction: discord.Interaction):
-        if select.values[0] == "start":
+    def __init__(self):
+        super().__init__()
+        self.select = discord.ui.Select(
+            placeholder="Alege o acțiune...",
+            options=[
+                discord.SelectOption(label="Start Giveaway", value="start", emoji="🎉"),
+                discord.SelectOption(label="End Giveaway", value="end", emoji="🛑")
+            ]
+        )
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        selected = self.select.values[0]
+        if selected == "start":
             await interaction.response.send_modal(GiveawayModal())
-        elif select.values[0] == "end":
+        elif selected == "end":
             await end_giveaway(interaction)
 
 class GiveawayModal(discord.ui.Modal, title="Start Giveaway"):
@@ -64,7 +72,6 @@ async def start_giveaway(interaction, prize, duration):
 
     active_giveaways[msg.id] = end_time
 
-    # Actualizare timp în timp real
     while True:
         time_left = int((end_time - datetime.datetime.utcnow()).total_seconds())
         if time_left <= 0:
@@ -75,7 +82,6 @@ async def start_giveaway(interaction, prize, duration):
 
     active_giveaways.pop(msg.id, None)
 
-    # Colectare participanți
     msg = await interaction.channel.fetch_message(msg.id)
     reaction = discord.utils.get(msg.reactions, emoji="🎉")
 
@@ -108,15 +114,44 @@ async def end_giveaway(interaction):
 
     await interaction.response.send_message("⚠️ Nu există niciun giveaway activ în acest canal.", ephemeral=True)
 
-# ================= COMENZI =================
+# ================= MONITORIZARE MENIU =================
 
-@bot.command()
-async def menu(ctx):
-    await ctx.send("🎁 Meniu Giveaway:", view=GiveawayMenu())
+async def ensure_menu_exists():
+    await bot.wait_until_ready()
+    channel = bot.get_channel(GIVEAWAY_CHANNEL_ID)
+
+    if not channel:
+        print("❌ Canalul de giveaway nu a fost găsit.")
+        return
+
+    while not bot.is_closed():
+        found = False
+        async for message in channel.history(limit=50):
+            if message.author == bot.user and message.content.startswith("🎁 Meniu Giveaway:"):
+                found = True
+                break
+
+        if not found:
+            await channel.send("🎁 Meniu Giveaway:", view=GiveawayMenu())
+            print("🔁 Meniul de giveaway a fost refăcut.")
+
+        await asyncio.sleep(3600)  # verifică la fiecare 1 oră
+
+# ================= EVENTS =================
 
 @bot.event
 async def on_ready():
     print(f"{bot.user} este online!")
+
+    channel = bot.get_channel(GIVEAWAY_CHANNEL_ID)
+    if channel:
+        async for message in channel.history(limit=50):
+            if message.author == bot.user and message.content.startswith("🎁 Meniu Giveaway:"):
+                break
+        else:
+            await channel.send("🎁 Meniu Giveaway:", view=GiveawayMenu())
+
+    bot.loop.create_task(ensure_menu_exists())
 
 @bot.event
 async def on_reaction_add(reaction, user):
