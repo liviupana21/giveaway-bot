@@ -24,7 +24,7 @@ active_giveaways = {}  # {message_id: end_time}
 
 class GiveawayMenu(discord.ui.View):
     def __init__(self):
-        super().__init__()
+        super().__init__(timeout=None)  # 🔒 Meniul rămâne activ permanent
         self.select = discord.ui.Select(
             placeholder="Alege o acțiune...",
             options=[
