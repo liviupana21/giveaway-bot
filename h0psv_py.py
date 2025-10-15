@@ -55,6 +55,11 @@ class GiveawayModal(discord.ui.Modal, title="Start Giveaway"):
 
         await start_giveaway(interaction, self.prize.value, duration_int)
 
+        await interaction.response.send_message(
+            f"✅ Giveaway-ul pentru **{self.prize.value}** a fost creat cu succes!",
+            ephemeral=True
+        )
+
 # ================= GIVEAWAY LOGIC =================
 
 async def start_giveaway(interaction, prize, duration):
@@ -82,7 +87,7 @@ async def start_giveaway(interaction, prize, duration):
 
     active_giveaways.pop(msg.id, None)
 
-    await asyncio.sleep(1)  # asigură că reacțiile sunt încărcate
+    await asyncio.sleep(1)
     reaction = discord.utils.get(msg.reactions, emoji="🎉")
 
     if not reaction:
@@ -151,7 +156,7 @@ async def ensure_menu_exists():
             await channel.send("🎁 Meniu Giveaway:", view=GiveawayMenu())
             print("🔁 Meniul de giveaway a fost refăcut.")
 
-        await asyncio.sleep(3600)  # verifică la fiecare 1 oră
+        await asyncio.sleep(3600)
 
 # ================= EVENTS =================
 
