@@ -76,12 +76,14 @@ async def giveaway(ctx, duration: int, *, prize: str):
 
     active_giveaways[msg.id] = end_time
 
+    # Actualizează timpul în fundal
     asyncio.create_task(update_giveaway_timer(msg, prize, end_time))
 
+    # Așteaptă până expiră giveaway-ul
     await asyncio.sleep(duration)
 
     # Giveaway terminat
-    active_giveaways.pop(msg.id)
+    active_giveaways.pop(msg.id, None)
 
     # Colectează participanții
     msg = await channel.fetch_message(msg.id)
