@@ -4,6 +4,8 @@ import asyncio
 import datetime
 import random
 import os
+import threading
+from flask import Flask
 
 # ================= CONFIG =================
 
@@ -17,6 +19,30 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# ================= FLASK HEALTH SERVER =================
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "✅ Bot is running", 200
+
+@app.route("/health")
+def health():
+    status = {
+        "bot_online": bot.is_ready(),
+        "guilds": len(bot.guilds),
+        "latency_ms": round(bot.latency * 1000) if bot.is_ready() else None
+    }
+    return status, 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
+# pornește Flask într-un thread separat
+threading.Thread(target=run_flask, daemon=True).start()
 
 # ================= STATE =================
 
@@ -49,7 +75,6 @@ class GiveawayModal(discord.ui.Modal, title="Start Giveaway"):
     duration = discord.ui.TextInput(label="Durată (secunde)", placeholder="Ex: 60", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Răspundem imediat ca să nu apară "Something went wrong"
         await interaction.response.defer(ephemeral=True)
         try:
             duration_int = int(self.duration.value)
